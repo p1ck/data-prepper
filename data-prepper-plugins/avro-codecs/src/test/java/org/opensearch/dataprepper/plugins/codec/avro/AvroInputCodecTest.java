@@ -33,6 +33,7 @@ import org.opensearch.dataprepper.plugins.fs.LocalInputFile;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
+import java.nio.ByteBuffer;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -192,7 +193,15 @@ public class AvroInputCodecTest {
 
             for(String key: expectedMap.keySet()){
                 Object actualRecordValue=actualRecord.getData().toMap().get(key);
-                if(!(actualRecordValue instanceof Map))
+                if(actualRecordValue instanceof byte[]){
+                    Object expectedValue = expectedMap.get(key);
+                    if(expectedValue instanceof GenericData.Fixed) {
+                        assertThat(actualRecordValue, equalTo(((GenericData.Fixed) expectedValue).bytes()));
+                    } else {
+                        assertThat(actualRecordValue, equalTo(((ByteBuffer) expectedValue).array()));
+                    }
+                }
+                else if(!(actualRecordValue instanceof Map))
                 assertThat(actualRecord.getData().toMap().get(key), equalTo(expectedMap.get(key)));
                 else{
                     GenericRecord expectedInnerRecord= (GenericRecord) expectedMap.get(key);
@@ -250,9 +259,15 @@ public class AvroInputCodecTest {
             innerRecord.put("firstFieldInNestedRecord", "testString"+rows);
             innerRecord.put("secondFieldInNestedRecord", rows);
 
+            GenericData.Fixed fixedData = new GenericData.Fixed(parseFixedSchema(), new byte[]{(byte) rows, (byte) (rows + 1), (byte) (rows + 2), (byte) (rows + 3)});
+
+            ByteBuffer bytesData = ByteBuffer.wrap(new byte[]{(byte) rows, (byte) (rows + 1)});
+
             record.put("name", "Person"+rows);
             record.put("age", rows);
             record.put("nestedRecord", innerRecord);
+            record.put("fixedData", fixedData);
+            record.put("bytesData", bytesData);
             recordList.add((record));
 
         }
@@ -269,8 +284,14 @@ public class AvroInputCodecTest {
                 .name("name").type().stringType().noDefault()
                 .name("age").type().intType().noDefault()
                 .name("nestedRecord").type(innerSchema).noDefault()
+                .name("fixedData").type(parseFixedSchema()).noDefault()
+                .name("bytesData").type().bytesType().noDefault()
                 .endRecord();
 
+    }
+
+    private static Schema parseFixedSchema() {
+        return Schema.createFixed("FixedData", null, null, 4);
     }
 
     private static Schema parseInnerSchemaForNestedRecord(){

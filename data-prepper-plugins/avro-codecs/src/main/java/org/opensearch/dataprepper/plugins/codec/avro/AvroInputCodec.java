@@ -107,6 +107,10 @@ public class AvroInputCodec implements InputCodec {
                 value = ((GenericData.Fixed) value).bytes();
             }
 
+            else if(value instanceof java.nio.ByteBuffer){
+                value = ((java.nio.ByteBuffer) value).array();
+            }
+
             eventData.put(field.name(), value);
         }
         return eventData;
